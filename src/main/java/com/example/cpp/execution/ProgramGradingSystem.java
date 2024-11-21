@@ -17,42 +17,100 @@ public class ProgramGradingSystem {
     private static final long TIME_LIMIT_MS = 2000; // 2 seconds
     private static final long MEMORY_LIMIT_BYTES = 256 * 1024 * 1024; // 256MB
 
-    public static TestResult gradeSubmission(String sourceCode, String input, String expectedOutput,
-                                             Language language, CompilerVersion compilerVersion) {
+//    public static TestResult gradeSubmission(String sourceCode, String input, String expectedOutput,
+//                                             Language language, CompilerVersion compilerVersion) {
+//        if (!SecurityConfig.isCodeSecure(sourceCode, language)) {
+//            return new TestResult(false, "Potential Malicious Code Detected", 0, false);
+//        }
+//
+//        String fileName = "Solution" + LanguageConfig.getFileExtension(language);
+//        Path filePath = Paths.get(fileName);
+//
+//        try {
+//            Files.writeString(filePath, sourceCode);
+//
+//            if (language != Language.PYTHON) {
+//                String[] compileCommand = LanguageConfig.getCompilerCommand(compilerVersion);
+//                if (compileCommand != null) {
+//                    Process compileProcess = new ProcessBuilder(compileCommand)
+//                            .redirectErrorStream(true)
+//                            .start();
+//
+//                    String compileOutput = captureProcessOutput(compileProcess);
+//                    int compileResult = compileProcess.waitFor();
+//                    if (compileResult != 0) {
+//                        return new TestResult(false, "Compilation Error: " + compileOutput, 0, false);
+//                    }
+//                }
+//            }
+//
+//            String[] runCommand = LanguageConfig.getRunCommand(language);
+//            ProcessBuilder runPB = new ProcessBuilder(runCommand)
+//                    .redirectErrorStream(true);
+//            Process runProcess = runPB.start();
+//
+//            return executeAndGrade(runProcess, input, expectedOutput);
+//
+//        } catch (Exception e) {
+//            return new TestResult(false, "Error: " + e.getMessage(), 0, false);
+//        } finally {
+//            cleanup(fileName, language);
+//        }
+//    }
+
+
+    public static List<TestResult> gradeSubmission(String sourceCode, List<TestCase> testCases,
+                                                   Language language, CompilerVersion compilerVersion) {
+        List<TestResult> results = new ArrayList<>();
+
+        // Kiểm tra bảo mật
         if (!SecurityConfig.isCodeSecure(sourceCode, language)) {
-            return new TestResult(false, "Potential Malicious Code Detected", 0, false);
+            results.add(new TestResult(false, "Potential Malicious Code Detected", 0, false));
+            return results;
         }
 
         String fileName = "Solution" + LanguageConfig.getFileExtension(language);
         Path filePath = Paths.get(fileName);
 
         try {
+            // Ghi source code vào file
             Files.writeString(filePath, sourceCode);
 
+            // Compile code (nếu cần)
+            Process compileProcess = null;
             if (language != Language.PYTHON) {
                 String[] compileCommand = LanguageConfig.getCompilerCommand(compilerVersion);
                 if (compileCommand != null) {
-                    Process compileProcess = new ProcessBuilder(compileCommand)
+                    compileProcess = new ProcessBuilder(compileCommand)
                             .redirectErrorStream(true)
                             .start();
 
                     String compileOutput = captureProcessOutput(compileProcess);
                     int compileResult = compileProcess.waitFor();
                     if (compileResult != 0) {
-                        return new TestResult(false, "Compilation Error: " + compileOutput, 0, false);
+                        results.add(new TestResult(false, "Compilation Error: " + compileOutput, 0, false));
+                        return results;
                     }
                 }
             }
 
+            // Chuẩn bị lệnh chạy
             String[] runCommand = LanguageConfig.getRunCommand(language);
             ProcessBuilder runPB = new ProcessBuilder(runCommand)
                     .redirectErrorStream(true);
-            Process runProcess = runPB.start();
 
-            return executeAndGrade(runProcess, input, expectedOutput);
+            // Chạy từng test case
+            for (TestCase testCase : testCases) {
+                Process runProcess = runPB.start();
+                TestResult result = executeAndGrade(runProcess, testCase.getInput(), testCase.getExpectedOutput());
+                results.add(result);
+            }
+
+            return results;
 
         } catch (Exception e) {
-            return new TestResult(false, "Error: " + e.getMessage(), 0, false);
+            results.add(new TestResult(false, "Error: " + e.getMessage(), 0, false));
+            return results;
         } finally {
             cleanup(fileName, language);
         }
@@ -99,16 +157,16 @@ public class ProgramGradingSystem {
             return new TestResult(false, "Time Limit Exceeded", TIME_LIMIT_MS, true);
         }
     }
-    public static List<TestResult> runTestCases(String sourceCode, List<TestCase> testCases,
-                                                Language language, CompilerVersion compilerVersion) {
-        List<TestResult> results = new ArrayList<>();
-        for (TestCase testCase : testCases) {
-            TestResult result = gradeSubmission(sourceCode, testCase.getInput(),
-                    testCase.getExpectedOutput(), language, compilerVersion);
-            results.add(result);
-        }
-        return results;
-    }
+//    public static List<TestResult> runTestCases(String sourceCode, List<TestCase> testCases,
+//                                                Language language, CompilerVersion compilerVersion) {
+//        List<TestResult> results = new ArrayList<>();
+//        for (TestCase testCase : testCases) {
+//            TestResult result = gradeSubmission(sourceCode, testCase.getInput(),
+//                    testCase.getExpectedOutput(), language, compilerVersion);
+//            results.add(result);
+//        }
+//        return results;
+//    }
     private static void cleanup(String fileName, Language language) {
         try {
             Files.deleteIfExists(Paths.get(fileName));
@@ -142,8 +200,8 @@ public class ProgramGradingSystem {
                         "}\n";
 
         System.out.println("\nTesting C++17 program:");
-        List<TestResult> cppResults = runTestCases(cppCode, testCases, Language.CPP, CompilerVersion.CPP_17);
-        printResults(cppResults);
+//        List<TestResult> cppResults = runTestCases(cppCode, testCases, Language.CPP, CompilerVersion.CPP_17);
+//        printResults(cppResults);
     }
 
     private static void printResults(List<TestResult> results) {

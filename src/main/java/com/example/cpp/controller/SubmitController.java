@@ -17,7 +17,7 @@ import java.util.List;
 public class SubmitController {
     @PostMapping("/submit")
     public List<TestResult> submitCode(@RequestBody CodeSubmissionRequest request) {
-        return ProgramGradingSystem.runTestCases(
+        return ProgramGradingSystem.gradeSubmission(
                 request.getSourceCode(),
                 request.getTestCases(),
                 request.getLanguage(),
