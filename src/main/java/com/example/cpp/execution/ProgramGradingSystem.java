@@ -27,10 +27,8 @@ public class ProgramGradingSystem {
         Path filePath = Paths.get(fileName);
 
         try {
-            // Write source code to file
             Files.writeString(filePath, sourceCode);
 
-            // Compile if needed (not for Python)
             if (language != Language.PYTHON) {
                 String[] compileCommand = LanguageConfig.getCompilerCommand(compilerVersion);
                 if (compileCommand != null) {
@@ -46,13 +44,11 @@ public class ProgramGradingSystem {
                 }
             }
 
-            // Run the program
             String[] runCommand = LanguageConfig.getRunCommand(language);
             ProcessBuilder runPB = new ProcessBuilder(runCommand)
                     .redirectErrorStream(true);
             Process runProcess = runPB.start();
 
-            // Handle execution
             return executeAndGrade(runProcess, input, expectedOutput);
 
         } catch (Exception e) {
@@ -76,13 +72,12 @@ public class ProgramGradingSystem {
 
     private static TestResult executeAndGrade(Process process, String input, String expectedOutput)
             throws Exception {
-        // Write input
+
         try (OutputStream os = process.getOutputStream()) {
             os.write(input.getBytes());
             os.flush();
         }
 
-        // Read output with timeout
         Future<String> outputFuture = Executors.newSingleThreadExecutor().submit(() -> {
             return captureProcessOutput(process);
         });
@@ -114,7 +109,6 @@ public class ProgramGradingSystem {
         }
         return results;
     }
-
     private static void cleanup(String fileName, Language language) {
         try {
             Files.deleteIfExists(Paths.get(fileName));
@@ -127,14 +121,11 @@ public class ProgramGradingSystem {
             e.printStackTrace();
         }
     }
-
     private static String normalizeString(String str) {
         return str.trim().replaceAll("\\s+", " ").replaceAll("\\r\\n", "\n");
     }
 
-    // Main method for testing
     public static void main(String[] args) {
-        // Sample test cases
         List<TestCase> testCases = new ArrayList<>();
         testCases.add(new TestCase("2 3\n", "5\n"));
         testCases.add(new TestCase("5 7\n", "12\n"));
