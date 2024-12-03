@@ -17,4 +17,6 @@ public class CodeSubmissionRequest {
     private List<TestCase> testCases;
     private Language language;
     private CompilerVersion compilerVersion;
+    private Long timeLimit;
+    private Long memoryUsed;
 }

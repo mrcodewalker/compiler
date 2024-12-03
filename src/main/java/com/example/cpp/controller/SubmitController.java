@@ -21,7 +21,8 @@ public class SubmitController {
                 request.getSourceCode(),
                 request.getTestCases(),
                 request.getLanguage(),
-                request.getCompilerVersion()
+                request.getCompilerVersion(),
+                request.getTimeLimit()
         );
     }
     @GetMapping("/compiler-versions")

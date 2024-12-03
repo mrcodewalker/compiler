@@ -14,58 +14,17 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class ProgramGradingSystem {
-    private static final long TIME_LIMIT_MS = 2000; // 2 seconds
+    private static final long TIME_LIMIT_MS = 1000; // 2 seconds
     private static final long MEMORY_LIMIT_BYTES = 256 * 1024 * 1024; // 256MB
 
-//    public static TestResult gradeSubmission(String sourceCode, String input, String expectedOutput,
-//                                             Language language, CompilerVersion compilerVersion) {
-//        if (!SecurityConfig.isCodeSecure(sourceCode, language)) {
-//            return new TestResult(false, "Potential Malicious Code Detected", 0, false);
-//        }
-//
-//        String fileName = "Solution" + LanguageConfig.getFileExtension(language);
-//        Path filePath = Paths.get(fileName);
-//
-//        try {
-//            Files.writeString(filePath, sourceCode);
-//
-//            if (language != Language.PYTHON) {
-//                String[] compileCommand = LanguageConfig.getCompilerCommand(compilerVersion);
-//                if (compileCommand != null) {
-//                    Process compileProcess = new ProcessBuilder(compileCommand)
-//                            .redirectErrorStream(true)
-//                            .start();
-//
-//                    String compileOutput = captureProcessOutput(compileProcess);
-//                    int compileResult = compileProcess.waitFor();
-//                    if (compileResult != 0) {
-//                        return new TestResult(false, "Compilation Error: " + compileOutput, 0, false);
-//                    }
-//                }
-//            }
-//
-//            String[] runCommand = LanguageConfig.getRunCommand(language);
-//            ProcessBuilder runPB = new ProcessBuilder(runCommand)
-//                    .redirectErrorStream(true);
-//            Process runProcess = runPB.start();
-//
-//            return executeAndGrade(runProcess, input, expectedOutput);
-//
-//        } catch (Exception e) {
-//            return new TestResult(false, "Error: " + e.getMessage(), 0, false);
-//        } finally {
-//            cleanup(fileName, language);
-//        }
-//    }
-
-
     public static List<TestResult> gradeSubmission(String sourceCode, List<TestCase> testCases,
-                                                   Language language, CompilerVersion compilerVersion) {
+                                                   Language language, CompilerVersion compilerVersion,
+                                                   Long timeLimit) {
         List<TestResult> results = new ArrayList<>();
 
         // Kiểm tra bảo mật
         if (!SecurityConfig.isCodeSecure(sourceCode, language)) {
-            results.add(new TestResult(false, "Potential Malicious Code Detected", 0, false));
+            results.add(new TestResult(false, "Potential Malicious Code Detected", 0, 0,0,false, 0L));
             return results;
         }
 
@@ -73,10 +32,8 @@ public class ProgramGradingSystem {
         Path filePath = Paths.get(fileName);
 
         try {
-            // Ghi source code vào file
             Files.writeString(filePath, sourceCode);
 
-            // Compile code (nếu cần)
             Process compileProcess = null;
             if (language != Language.PYTHON) {
                 String[] compileCommand = LanguageConfig.getCompilerCommand(compilerVersion);
@@ -88,7 +45,7 @@ public class ProgramGradingSystem {
                     String compileOutput = captureProcessOutput(compileProcess);
                     int compileResult = compileProcess.waitFor();
                     if (compileResult != 0) {
-                        results.add(new TestResult(false, "Compilation Error: " + compileOutput, 0, false));
+                        results.add(new TestResult(false, "Compilation Error: " + compileOutput, 0, 0,0,false, 0L));
                         return results;
                     }
                 }
@@ -102,14 +59,18 @@ public class ProgramGradingSystem {
             // Chạy từng test case
             for (TestCase testCase : testCases) {
                 Process runProcess = runPB.start();
-                TestResult result = executeAndGrade(runProcess, testCase.getInput(), testCase.getExpectedOutput());
+                TestResult result = executeAndGrade(runProcess, testCase.getInput(), testCase.getExpectedOutput(), timeLimit);
                 results.add(result);
+                if (!result.passed
+                        || result.getExecutionTime()>=timeLimit
+                        || result.timeLimit)
+                    return results;
             }
 
             return results;
 
         } catch (Exception e) {
-            results.add(new TestResult(false, "Error: " + e.getMessage(), 0, false));
+            results.add(new TestResult(false, "Error: " + e.getMessage(), 0, 0,0,false, 0L));
             return results;
         } finally {
             cleanup(fileName, language);
@@ -128,9 +89,11 @@ public class ProgramGradingSystem {
         }
     }
 
-    private static TestResult executeAndGrade(Process process, String input, String expectedOutput)
+    private static TestResult executeAndGrade(Process process, String input, String expectedOutput, Long timeLimit)
             throws Exception {
-
+        long startTime = System.currentTimeMillis();
+        Runtime runtime = Runtime.getRuntime();
+        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
         try (OutputStream os = process.getOutputStream()) {
             os.write(input.getBytes());
             os.flush();
@@ -141,32 +104,27 @@ public class ProgramGradingSystem {
         });
 
         try {
-            String actualOutput = outputFuture.get(TIME_LIMIT_MS, TimeUnit.MILLISECONDS);
-            long executionTime = System.currentTimeMillis();
-
+            String actualOutput = outputFuture.get(timeLimit, TimeUnit.MILLISECONDS);
+            long endTime = System.currentTimeMillis();
+            long executionTime = endTime-startTime;
+            long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
+            long memoryUsed = memoryAfter - memoryBefore;
             if (normalizeString(actualOutput).equals(normalizeString(expectedOutput))) {
-                return new TestResult(true, "Passed", executionTime, false);
+                return new TestResult(true, "Passed", startTime,endTime,executionTime, false, memoryUsed);
             } else {
                 return new TestResult(false,
                         String.format("Wrong Answer. Expected: %s, Got: %s",
                                 expectedOutput.replace("\n","").trim(), actualOutput.replace("\n","").trim()),
-                        executionTime, false);
+                        startTime, endTime, executionTime, false, memoryUsed);
             }
         } catch (TimeoutException e) {
+            long endTime = System.currentTimeMillis();
+            long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
+            long memoryUsed = memoryAfter - memoryBefore;
             process.destroyForcibly();
-            return new TestResult(false, "Time Limit Exceeded", TIME_LIMIT_MS, true);
+            return new TestResult(false, "Time Limit Exceeded", startTime, startTime+timeLimit, timeLimit, true, memoryUsed);
         }
     }
-//    public static List<TestResult> runTestCases(String sourceCode, List<TestCase> testCases,
-//                                                Language language, CompilerVersion compilerVersion) {
-//        List<TestResult> results = new ArrayList<>();
-//        for (TestCase testCase : testCases) {
-//            TestResult result = gradeSubmission(sourceCode, testCase.getInput(),
-//                    testCase.getExpectedOutput(), language, compilerVersion);
-//            results.add(result);
-//        }
-//        return results;
-//    }
     private static void cleanup(String fileName, Language language) {
         try {
             Files.deleteIfExists(Paths.get(fileName));

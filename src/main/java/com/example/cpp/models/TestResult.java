@@ -1,16 +1,20 @@
 package com.example.cpp.models;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
 public class TestResult {
     public boolean passed;
     public String message;
+    public long startTime;
+    public long endTime;
     public long executionTime;
-    public long finishTime;
     public boolean timeLimit;
-
-    public TestResult(boolean passed, String message, long executionTime, boolean timeLimit) {
-        this.passed = passed;
-        this.message = message;
-        this.executionTime = executionTime;
-        this.timeLimit = timeLimit;
-    }
+    public Long memoryUsed;
 }
